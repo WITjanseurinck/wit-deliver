@@ -1,0 +1,20 @@
+{
+  "name": "wit-deliver",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Interne tool: klanten en projecten afgeschermd opleveren, met per-persoon toegang. Losstaand van elke specifieke campagne.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "multer": "^2.0.1"
+  }
+}
