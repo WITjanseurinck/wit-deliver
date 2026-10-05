@@ -30,7 +30,7 @@ Klant
 
 ```
 npm install
-cp .env.example .env   # vul SESSION_SECRET en ADMIN_PASSWORD in
+cp .env.example .env   # vul SESSION_SECRET en ADMIN_PASSWORD in; data komt dan in ./data
 npm start
 ```
 
@@ -72,13 +72,16 @@ helemaal.
 
 ## Opslag
 
-Platte JSON (`data/db.json`), geen databaseserver nodig. Prima voor het
-aantal klanten/projecten/personen waar dit voor bedoeld is. Geen
-gelijktijdige meerdere Node-processen op dezelfde `data/`-map (zie
-`src/store.js`) — draai dit dus als één proces (bv. onder pm2 met
-`instances: 1`, zie `DEPLOY.md`).
+Platte JSON (`db.json` in `DATA_DIR`, in productie `/data`), geen
+databaseserver nodig. Prima voor het aantal klanten/projecten/personen waar dit
+voor bedoeld is. Het bestand heeft een `schemaVersion` en wordt bij het
+opstarten automatisch omgezet (met back-up) als de structuur is gewijzigd, zie
+`DEPLOY.md`. Geen gelijktijdige meerdere Node-processen op dezelfde map: draai
+dit als één instance.
 
 ## Deployment
 
-Zie `DEPLOY.md` voor hoe dit op de wit.agency-VPS als eigen, continu
-draaiend proces komt te staan (achter een reverse-proxy-subdomein).
+Productie: <https://deliver.wit.agency>, gedeployd met Coolify op de
+wit.agency-VPS. Instellingen, omgevingsvariabelen, het persistente volume en
+het updaten staan in `DEPLOY.md`. Deze repo bevat bewust geen eigen
+deploy-scripts of workflows.

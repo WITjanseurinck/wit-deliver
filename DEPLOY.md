@@ -1,136 +1,83 @@
-# wit-deliver op de wit.agency-VPS zetten
+# wit-deliver deployen met Coolify
 
-Voor een Claude-sessie (of mens) met SSH-toegang tot de wit.agency-server —
-deze cloudsessie heeft dat niet.
+`wit-deliver` draait in productie op <https://deliver.wit.agency>, als
+applicatie in Coolify op de wit.agency-VPS. Er zijn bewust geen eigen
+deploy-scripts of workflows in deze repo: Coolify bouwt en start de app zelf.
 
-## Doel
+## Instelling in Coolify
 
-`wit-deliver` als eigen, continu draaiend Node-proces op de VPS zetten, apart
-van de bestaande wit.agency-site, bereikbaar op een eigen (sub)domein, bv.
-`https://deliver.wit.agency` (kies zelf een naam die niets verraadt over wat
-erachter zit — niet per se nodig om "deliver" te gebruiken).
+- **Bron**: deze GitHub-repo, branch `main`.
+- **Build pack**: Nixpacks (de standaard). Het herkent `package.json`, voert
+  `npm install` uit en start met `npm start` (`node src/server.js`).
+  Node ≥18 is vereist.
+- **Poort**: `3300` (Ports Exposes). Coolify zet er de reverse proxy en het
+  https-certificaat voor `deliver.wit.agency` voor.
+- **Instances**: precies **één**. `db.json` is een bestand dat één proces
+  tegelijk beschrijft; schaal dit dus niet op en draai geen tweede replica op
+  hetzelfde volume.
+- **Persistent storage**: een volume met mount-pad `/data`. Hierin staat alles
+  wat echt verloren kan gaan.
 
-## Vereisten op de server
+### Omgevingsvariabelen (Coolify → Environment Variables)
 
-- Node.js ≥18 (`node -v`). Zo niet: installeer via nvm of de
-  pakketbeheerder van de distributie — vraag niet zomaar een systeem-Node te
-  vervangen als er al andere Node-sites op draaien.
-- Een procesbeheerder die het proces na een crash of reboot herstart. Twee
-  opties:
-  - **pm2** (`npm install -g pm2`) — eenvoudigst als er nog geen
-    procesbeheer is.
-  - **systemd** — als dat al de standaard is voor andere diensten op deze
-    server, sluit daarbij aan (voorbeeld-unit onderaan).
-- Apache (vermoedelijk, zie `DEPLOY-toegang.md` in de `hart-voor-kennis`-repo)
-  met `mod_proxy` en `mod_proxy_http` ingeschakeld, voor de reverse proxy.
-  Bij nginx: zie de nginx-variant onderaan.
+| Variabele | Waarde |
+|---|---|
+| `SESSION_SECRET` | lange willekeurige string (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`). Verplicht; de app start niet zonder. |
+| `ADMIN_USER` | gebruikersnaam van de Owner |
+| `ADMIN_PASSWORD` | sterk, uniek wachtwoord van de Owner |
+| `DATA_DIR` | `/data` (moet samenvallen met het mount-pad van het volume) |
+| `NODE_ENV` | `production` (zet de sessiecookie op `secure`) |
+| `PORT` | `3300` |
 
-## Stappen
+Wijzig je `ADMIN_PASSWORD`, herstart dan de applicatie in Coolify. Zet geen
+`.env`-bestand in de repo; `.env.example` is enkel een overzicht.
 
-1. **Code naar de server.**
-   ```
-   git clone https://github.com/witjanseurinck/wit-deliver.git /opt/wit-deliver
-   cd /opt/wit-deliver
-   npm install --omit=dev
-   ```
-   (Geen SSH/git-toegang op de server? `scp -r` de map, exclusief
-   `node_modules` en `.env`, en draai `npm install` daar.)
+## Updaten
 
-2. **`.env` aanmaken** — nooit committen, zet 'm alleen op de server:
-   ```
-   cp .env.example .env
-   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-   ```
-   Plak die waarde bij `SESSION_SECRET`. Vul `ADMIN_USER` en een sterk,
-   uniek `ADMIN_PASSWORD` in. Zet `NODE_ENV=production`. Laat `PORT` op
-   `3300` tenzij die al in gebruik is.
-   ```
-   chmod 600 .env
-   ```
+1. Merge naar `main`.
+2. Klik in Coolify op **Deploy** (of laat auto-deploy aanstaan, zoals jij het
+   hebt ingesteld).
 
-3. **Dataplek.** Standaard komt `data/db.json` naast de code
-   (`/opt/wit-deliver/data/`). Dat overleeft een `git pull`, maar niet een
-   `rm -rf` van de hele map — overweeg `DATA_DIR=/var/lib/wit-deliver` in
-   `.env` te zetten en die map vooraf aan te maken
-   (`mkdir -p /var/lib/wit-deliver`) als je code en data strikt gescheiden
-   wil houden.
+De data in `/data` blijft staan: het volume wordt bij een nieuwe deploy
+hergebruikt.
 
-4. **Proces starten.**
+## Wijzigingen aan de structuur van `db.json`
 
-   Met pm2:
-   ```
-   pm2 start src/server.js --name wit-deliver
-   pm2 save
-   pm2 startup   # volg de instructie die dit commando zelf toont
-   ```
+Het bestand heeft een `schemaVersion` (nu `2`). Bij het opstarten:
 
-   Met systemd — zet dit in `/etc/systemd/system/wit-deliver.service`:
-   ```
-   [Unit]
-   Description=wit-deliver
-   After=network.target
+- is `db.json` van een oudere versie, dan maakt de app eerst een back-up ernaast
+  (`/data/db.json.v<versie>.<tijdstip>.bak`) en zet daarna om en schrijft weg;
+- is het al de huidige versie, dan gebeurt er niets;
+- is het van een **nieuwere** versie dan de code (bv. na een rollback), dan
+  weigert de app te starten in plaats van data te beschadigen.
 
-   [Service]
-   WorkingDirectory=/opt/wit-deliver
-   ExecStart=/usr/bin/node src/server.js
-   Restart=always
-   User=www-data
-   EnvironmentFile=/opt/wit-deliver/.env
+De omzetting staat in `src/store.js` (`MIGRATIONS`). Wie de structuur
+aanpast, verhoogt `SCHEMA_VERSION`, voegt een stap toe die alleen aanvult en
+test die met een kopie van een echte `db.json`.
 
-   [Install]
-   WantedBy=multi-user.target
-   ```
-   dan:
-   ```
-   systemctl daemon-reload
-   systemctl enable --now wit-deliver
-   ```
+Versie 1 → 2 (rollen, feedback): bestaande personen worden **Client**, krijgen
+`mustChange: false` (ze behouden hun wachtwoord), projecten krijgen status
+`open`, en er komt een lege lijst `comments`.
 
-5. **Reverse proxy.** Apache-voorbeeld (eigen vhost-bestand of toevoegen aan
-   een bestaand ssl-vhost voor het gekozen subdomein):
-   ```
-   <VirtualHost *:443>
-     ServerName deliver.wit.agency
-     ProxyPreserveHost On
-     ProxyPass / http://127.0.0.1:3300/
-     ProxyPassReverse / http://127.0.0.1:3300/
-     # certificaat zoals de rest van wit.agency al doet (Let's Encrypt?)
-   </VirtualHost>
-   ```
-   nginx-equivalent:
-   ```
-   server {
-     listen 443 ssl;
-     server_name deliver.wit.agency;
-     location / {
-       proxy_pass http://127.0.0.1:3300;
-       proxy_set_header Host $host;
-       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-       proxy_set_header X-Forwarded-Proto $scheme;
-     }
-   }
-   ```
-   Zorg voor een geldig certificaat op het subdomein (Let's Encrypt, zoals de
-   rest van wit.agency vermoedelijk al gebruikt) — zonder https staan
-   wachtwoorden in platte tekst over de lijn.
+Terugdraaien naar de oude versie van de code kan alleen als je ook de
+`.bak`-kopie terugzet als `db.json`.
 
-6. **Controleer.**
-   - `https://deliver.wit.agency/login` → aanmelden (de owner gaat daarna naar `/admin`).
-   - Maak een testklant + testproject, plaats een simpele HTML-pagina, maak
-     een account aan, log in een incognitovenster in als dat account, en
-     controleer dat je **alleen** dat project ziet.
-   - Controleer ook dat `https://deliver.wit.agency/` zonder in te loggen
-     naar `/login` stuurt, en dat er geen enkele vermelding van Claude,
-     Anthropic of de broncode van deze tool zichtbaar is.
+## Controleren na een deploy
+
+- `https://deliver.wit.agency/login` toont het aanmeldscherm in WIT-huisstijl.
+- Bekijk in Coolify de logs: bij de eerste start na de update staat er
+  `db.json omgezet van versie 1 naar 2; back-up: …`.
+- Meld je aan als Owner (naar `/admin`) en controleer dat klanten, projecten
+  en accounts er nog zijn.
+- Meld je met een bestaand klantaccount aan: dat werkt met het oude wachtwoord
+  en ziet alleen de eigen projecten.
 
 ## Onderhoud
 
-- **Code bijwerken**: `git pull && npm install --omit=dev` in
-  `/opt/wit-deliver`, dan `pm2 restart wit-deliver` (of
-  `systemctl restart wit-deliver`). De data in `data/db.json` blijft staan.
-- **Back-up**: `data/db.json` is het enige dat echt verloren kan gaan (bevat
-  alle klanten, projecten, pagina's en wachtwoord-hashes). Een periodieke
-  kopie (bv. dagelijkse cron naar een andere map of externe opslag) is
-  voldoende; het is platte JSON, makkelijk te doorzoeken en terug te zetten.
-- **Wachtwoord admin vergeten/gelekt**: pas `ADMIN_PASSWORD` in `.env` aan en
-  herstart het proces.
+- **Back-up**: maak in Coolify (of via de VPS) een periodieke kopie van het
+  volume `/data`. `db.json` bevat alle klanten, projecten, pagina's,
+  opmerkingen en wachtwoord-hashes.
+- **Wachtwoord Owner vergeten of gelekt**: pas `ADMIN_PASSWORD` aan in Coolify
+  en herstart.
+- **Wachtwoord van een persoon**: Owner → project → "nieuw wachtwoord". Die
+  persoon kiest bij de volgende aanmelding een eigen wachtwoord.

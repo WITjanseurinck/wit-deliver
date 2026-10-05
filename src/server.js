@@ -18,6 +18,12 @@ if (!process.env.ADMIN_PASSWORD) {
   console.warn('Let op: ADMIN_PASSWORD staat niet in .env — aanmelden als owner werkt dan niet.');
 }
 
+const store = require('./store');
+const mig = store.init();
+if (mig.migrated) {
+  console.log(`db.json omgezet van versie ${mig.from} naar ${mig.to}; back-up: ${mig.backup}`);
+}
+
 const app = express();
 // Achter een reverse proxy (Apache/nginx op de VPS) die https afhandelt:
 // nodig zodat secure cookies en req.secure kloppen.
