@@ -202,8 +202,9 @@ function renderDashboard(db) {
     title: 'Beheer · klanten',
     body: `
 <nav class="crumbs"><a href="/admin">Klanten</a></nav>
-<h1>Klanten</h1>
-<p class="sub">Elke klant is afgeschermd van elke andere. Een project hoort bij één klant.</p>
+<div class="lead"><div class="eyebrow">Beheer</div>
+<h1><span class="spray">Klanten</span></h1>
+<p class="sub">Elke klant is afgeschermd van elke andere. Een project hoort bij één klant.</p></div>
 <div class="card">
   <table>
     <tr><th>Naam</th><th>Slug</th><th>Projecten</th><th></th></tr>
@@ -236,8 +237,9 @@ function renderClient(db, client) {
     title: `Beheer · ${client.naam}`,
     body: `
 <nav class="crumbs"><a href="/admin">Klanten</a><a href="/admin/clients/${client.id}">${esc(client.naam)}</a></nav>
-<h1>${esc(client.naam)}</h1>
-<p class="sub">Projecten van deze klant.</p>
+<div class="lead"><div class="eyebrow">Klant</div>
+<h1><span class="spray">${esc(client.naam)}</span></h1>
+<p class="sub">Projecten van deze klant.</p></div>
 <div class="card">
   <table>
     <tr><th>Project</th><th>Slug</th><th>Pagina</th><th>Personen</th></tr>
@@ -262,7 +264,7 @@ function renderFeedback(db, project) {
     `<div class="comment"><div class="meta"><b>${esc(c.door)}</b><span class="pill ${esc(c.role)}">${esc(c.role)}</span>${esc(new Date(c.createdAt).toLocaleString('nl-BE', { dateStyle: 'medium', timeStyle: 'short' }))}</div><p>${esc(c.tekst)}</p></div>`
   ).join('');
   const besluit = project.besluit ? ` · ${esc(project.besluit.door)}` : '';
-  return `<div class="card" style="margin-top:20px">
+  return `<div class="card">
   <h2>Feedback ${status}<span class="muted">${besluit}</span></h2>
   ${comments || '<p class="muted">Nog geen opmerkingen.</p>'}
 </div>`;
@@ -300,11 +302,12 @@ function renderProject(db, client, project, query) {
     title: `Beheer · ${project.naam}`,
     body: `
 <nav class="crumbs"><a href="/admin">Klanten</a><a href="/admin/clients/${client.id}">${esc(client.naam)}</a><a href="/admin/projects/${project.id}">${esc(project.naam)}</a></nav>
-<h1>${esc(project.naam)}</h1>
-<p class="sub">${esc(client.naam)} · publieke weergave na aanmelden: <code>/bekijk/${project.id}</code></p>
+<div class="lead"><div class="eyebrow">Project</div>
+<h1><span class="spray">${esc(project.naam)}</span></h1>
+<p class="sub">${esc(client.naam)} · publieke weergave na aanmelden: <code>/bekijk/${project.id}</code></p></div>
 ${nieuwWachtwoord}
 <div class="card">
-  <h2 style="font-size:15px;margin:0 0 4px">Pagina</h2>
+  <h2>Pagina</h2>
   <p class="muted">${project.html ? 'Er staat een pagina klaar.' : 'Nog geen pagina geplaatst.'} ${project.html ? `<a href="/bekijk/${project.id}" target="_blank">bekijken</a>` : ''}</p>
   <form method="post" action="/admin/projects/${project.id}/html" enctype="multipart/form-data">
     <label>Nieuw HTML-bestand plaatsen (vervangt de huidige pagina)</label>
@@ -313,8 +316,8 @@ ${nieuwWachtwoord}
   </form>
 </div>
 ${renderFeedback(db, project)}
-<div class="card" style="margin-top:20px">
-  <h2 style="font-size:15px;margin:0 0 4px">Wie heeft toegang</h2>
+<div class="card">
+  <h2>Wie heeft toegang</h2>
   <table>
     <tr><th>Naam</th><th>Gebruikersnaam</th><th>Rol</th><th></th></tr>
     ${rows || '<tr><td colspan="4" class="muted">Nog niemand.</td></tr>'}

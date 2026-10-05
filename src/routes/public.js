@@ -120,7 +120,7 @@ function noAccess(res, user) {
     page({
       title: 'Geen toegang',
       user,
-      body: `<div class="card"><h1>Geen toegang</h1><p class="sub">Dit project staat niet open voor jouw account. <a href="/">Terug</a></p></div>`,
+      body: `<div class="card"><h1>Geen <span class="spray">toegang</span></h1><p class="sub">Dit project staat niet open voor jouw account. <a href="/">Terug</a></p></div>`,
     })
   );
 }
@@ -235,19 +235,18 @@ ${comments || '<p class="muted">Nog geen opmerkingen.</p>'}
 function renderLogin(error) {
   return page({
     title: 'Aanmelden',
+    center: true,
     body: `
-<h1>Aanmelden</h1>
-<p class="sub">Je opgeleverde werk, afgeschermd.</p>
-<div class="card">
-  ${error ? `<div class="error">${esc(error)}</div>` : ''}
-  <form method="post" action="/login">
-    <label for="username">Gebruikersnaam</label>
-    <input type="text" id="username" name="username" autocomplete="username" required autofocus>
-    <label for="password">Wachtwoord</label>
-    <input type="password" id="password" name="password" autocomplete="current-password" required>
-    <button type="submit">Aanmelden</button>
-  </form>
-</div>`,
+<form class="login" method="post" action="/login">
+  <div class="eyebrow">Klantomgeving</div>
+  <h1>Meld je <span class="spray">aan</span></h1>
+  ${error ? `<div class="error" style="margin:0">${esc(error)}</div>` : ''}
+  <label for="username">Gebruikersnaam</label>
+  <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+  <label for="password">Wachtwoord</label>
+  <input type="password" id="password" name="password" autocomplete="current-password" required>
+  <button type="submit">Aanmelden</button>
+</form>`,
   });
 }
 
@@ -257,8 +256,9 @@ function renderWachtwoord(user, error) {
     title: 'Wachtwoord',
     user,
     body: `
-<h1>${eerste ? 'Kies je eigen wachtwoord' : 'Wachtwoord wijzigen'}</h1>
-<p class="sub">${eerste ? 'Je bent aangemeld met een startwachtwoord. Kies nu een wachtwoord dat alleen jij kent.' : 'Minstens 10 tekens.'}</p>
+<div class="lead"><div class="eyebrow">Account</div>
+<h1>${eerste ? 'Kies je eigen <span class="spray">wachtwoord</span>' : 'Wachtwoord <span class="spray">wijzigen</span>'}</h1>
+<p class="sub">${eerste ? 'Je bent aangemeld met een startwachtwoord. Kies nu een wachtwoord dat alleen jij kent.' : 'Minstens 10 tekens.'}</p></div>
 <div class="card">
   ${error ? `<div class="error">${esc(error)}</div>` : ''}
   <form method="post" action="/wachtwoord">
@@ -285,8 +285,9 @@ function renderOverzicht(user, projects, db) {
     title: 'Projecten',
     user,
     body: `
-<h1>Hallo${user.naam ? ', ' + esc(user.naam) : ''}</h1>
-<p class="sub">Kies een project.</p>
+<div class="lead"><div class="eyebrow">Jouw projecten</div>
+<h1>Hallo${user.naam ? ', <span class="spray">' + esc(user.naam) + '</span>' : ''}</h1>
+<p class="sub">Kies een project.</p></div>
 <div class="card">
   <ul class="list">${rows || '<li class="muted" style="padding:12px 0">Nog geen project voor je klaargezet.</li>'}</ul>
 </div>`,
