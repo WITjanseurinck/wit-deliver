@@ -54,10 +54,10 @@ router.get('/bekijk/:projectId', requireLogin, (req, res) => {
   const person = db.people.find((p) => p.id === req.session.personId);
   const project = db.projects.find((pr) => pr.id === req.params.projectId);
   if (!person || !project || !person.projectIds.includes(project.id)) {
-    return res.status(403).send(page({ title: 'Geen toegang', body: `<div class="card"><h1>Geen toegang</h1><p class="sub">Dit project staat niet open voor jouw account. <a href="/">Terug</a></p></div>` }));
+    return res.status(403).send(page({ title: 'Geen toegang', body: `<div class="card"><h1>Geen toegang</h1><p class="sub" style="margin-top:8px">Dit project staat niet open voor jouw account. <a href="/">Terug</a></p></div>` }));
   }
   if (!project.html) {
-    return res.send(page({ title: project.naam, body: `<div class="card"><h1>${esc(project.naam)}</h1><p class="sub">Nog geen pagina geplaatst voor dit project.</p></div>` }));
+    return res.send(page({ title: project.naam, body: `<div class="card"><h1>${esc(project.naam)}</h1><p class="sub" style="margin-top:8px">Nog geen pagina geplaatst voor dit project.</p></div>` }));
   }
   res.set('Content-Type', 'text/html; charset=utf-8');
   res.send(project.html);
@@ -68,7 +68,7 @@ function renderLogin(error) {
     title: 'Aanmelden',
     body: `
 <h1>Aanmelden</h1>
-<p class="sub">WIT</p>
+<p class="sub">Log in om je project te bekijken.</p>
 <div class="card">
   ${error ? `<div class="error">${esc(error)}</div>` : ''}
   <form method="post" action="/login">
@@ -86,16 +86,17 @@ function renderOverzicht(person, projects, db) {
   const rows = projects
     .map((pr) => {
       const client = db.clients.find((c) => c.id === pr.clientId);
-      return `<li><a href="/bekijk/${pr.id}">${esc(client ? client.naam : '')} · ${esc(pr.naam)}</a></li>`;
+      return `<li><a href="/bekijk/${pr.id}">${esc(pr.naam)}<small>${esc(client ? client.naam : '')}</small></a></li>`;
     })
     .join('');
   return page({
     title: 'Projecten',
+    brandSub: person.naam || person.username,
     body: `
 <h1>Hallo${person.naam ? ', ' + esc(person.naam) : ''}</h1>
 <p class="sub">Kies een project.</p>
 <div class="card">
-  <ul>${rows || '<li class="muted">Nog geen project voor je klaargezet.</li>'}</ul>
+  <ul class="projlist">${rows || '<li class="empty">Nog geen project voor je klaargezet.</li>'}</ul>
 </div>
 <p class="muted" style="margin-top:16px"><a href="/logout">Afmelden</a></p>`,
   });

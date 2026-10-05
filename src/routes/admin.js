@@ -65,7 +65,7 @@ router.post('/admin/clients/:clientId/delete', async (req, res) => {
 router.get('/admin/clients/:clientId', (req, res) => {
   const db = store.load();
   const client = db.clients.find((c) => c.id === req.params.clientId);
-  if (!client) return res.status(404).send(page({ title: 'Niet gevonden', body: '<div class="card">Klant niet gevonden. <a href="/admin">Terug</a></div>' }));
+  if (!client) return res.status(404).send(page({ title: 'Niet gevonden', body: '<div class="card"><h1>Niet gevonden</h1><p class="sub" style="margin-top:8px">Klant niet gevonden. <a href="/admin">Terug</a></p></div>' }));
   res.send(renderClient(db, client));
 });
 
@@ -105,7 +105,7 @@ router.post('/admin/projects/:projectId/delete', async (req, res) => {
 router.get('/admin/projects/:projectId', (req, res) => {
   const db = store.load();
   const project = db.projects.find((p) => p.id === req.params.projectId);
-  if (!project) return res.status(404).send(page({ title: 'Niet gevonden', body: '<div class="card">Project niet gevonden. <a href="/admin">Terug</a></div>' }));
+  if (!project) return res.status(404).send(page({ title: 'Niet gevonden', body: '<div class="card"><h1>Niet gevonden</h1><p class="sub" style="margin-top:8px">Project niet gevonden. <a href="/admin">Terug</a></p></div>' }));
   const client = db.clients.find((c) => c.id === project.clientId);
   res.send(renderProject(db, client, project, req.query));
 });
@@ -199,7 +199,7 @@ function renderAdminLogin(error) {
     title: 'Beheer · aanmelden',
     body: `
 <h1>Beheer</h1>
-<p class="sub">WIT — wit-deliver</p>
+<p class="sub">wit-deliver</p>
 <div class="card">
   ${error ? `<div class="error">${esc(error)}</div>` : ''}
   <form method="post" action="/admin/login">
@@ -213,30 +213,36 @@ function renderAdminLogin(error) {
   });
 }
 
+function nav(...crumbs) {
+  return `<nav>${crumbs.map((c) => (typeof c === 'string' ? c : `<a href="${c.href}">${esc(c.label)}</a>`)).join('<span class="sep">/</span>')}
+  <span style="float:right"><a href="#" onclick="document.getElementById('lo').submit();return false">Afmelden</a></span>
+  <form id="lo" method="post" action="/admin/logout" style="display:none"></form></nav>`;
+}
+
 function renderDashboard(db) {
   const rows = db.clients
     .map((c) => {
       const projectCount = db.projects.filter((p) => p.clientId === c.id).length;
       return `<tr>
         <td><a href="/admin/clients/${c.id}">${esc(c.naam)}</a></td>
-        <td class="muted">${c.slug}</td>
+        <td class="muted">${esc(c.slug)}</td>
         <td>${projectCount}</td>
-        <td><form method="post" action="/admin/clients/${c.id}/delete" onsubmit="return confirm('Klant ${esc(c.naam)} en alle projecten verwijderen?')"><button type="submit" class="danger">verwijderen</button></form></td>
+        <td><form method="post" action="/admin/clients/${c.id}/delete" onsubmit="return confirm('Klant ${esc(c.naam)} en alle projecten verwijderen?')"><button type="submit" class="secondary danger small">verwijderen</button></form></td>
       </tr>`;
     })
     .join('');
   return page({
     wide: true,
     title: 'Beheer · klanten',
+    brandSub: 'Beheer',
     body: `
-<nav><a href="/admin">Klanten</a><a href="/admin/logout" onclick="document.getElementById('lo').submit();return false">Afmelden</a>
-<form id="lo" method="post" action="/admin/logout" style="display:none"></form></nav>
+${nav({ href: '/admin', label: 'Klanten' })}
 <h1>Klanten</h1>
 <p class="sub">Elke klant is afgeschermd van elke andere. Een project hoort bij één klant.</p>
 <div class="card">
   <table>
     <tr><th>Naam</th><th>Slug</th><th>Projecten</th><th></th></tr>
-    ${rows || '<tr><td colspan="4" class="muted">Nog geen klant.</td></tr>'}
+    ${rows || '<tr><td colspan="4" class="empty">Nog geen klant.</td></tr>'}
   </table>
   <form method="post" action="/admin/clients" class="row" style="margin-top:20px">
     <input type="text" name="naam" placeholder="Naam van de klant" required style="flex:1;min-width:200px">
@@ -253,8 +259,8 @@ function renderClient(db, client) {
       const n = db.people.filter((pe) => pe.projectIds.includes(p.id)).length;
       return `<tr>
         <td><a href="/admin/projects/${p.id}">${esc(p.naam)}</a></td>
-        <td class="muted">${p.slug}</td>
-        <td>${p.html ? '<span class="pill">pagina geplaatst</span>' : '<span class="pill">nog leeg</span>'}</td>
+        <td class="muted">${esc(p.slug)}</td>
+        <td>${p.html ? '<span class="pill ok">pagina geplaatst</span>' : '<span class="pill">nog leeg</span>'}</td>
         <td>${n}</td>
       </tr>`;
     })
@@ -262,14 +268,15 @@ function renderClient(db, client) {
   return page({
     wide: true,
     title: `Beheer · ${client.naam}`,
+    brandSub: 'Beheer',
     body: `
-<nav><a href="/admin">Klanten</a><a href="/admin/clients/${client.id}">${esc(client.naam)}</a></nav>
+${nav({ href: '/admin', label: 'Klanten' }, { href: `/admin/clients/${client.id}`, label: client.naam })}
 <h1>${esc(client.naam)}</h1>
 <p class="sub">Projecten van deze klant.</p>
 <div class="card">
   <table>
     <tr><th>Project</th><th>Slug</th><th>Pagina</th><th>Personen</th></tr>
-    ${rows || '<tr><td colspan="4" class="muted">Nog geen project.</td></tr>'}
+    ${rows || '<tr><td colspan="4" class="empty">Nog geen project.</td></tr>'}
   </table>
   <form method="post" action="/admin/clients/${client.id}/projects" enctype="multipart/form-data" style="margin-top:20px">
     <label>Naam van het project</label>
@@ -278,8 +285,49 @@ function renderClient(db, client) {
     <input type="file" name="html" accept=".html,text/html">
     <button type="submit">Project toevoegen</button>
   </form>
-</div>`,
+</div>
+${renderKoppelingen(client)}`,
   });
+}
+
+// ---- Koppelingen (referentie-info, geen live verbinding) ----
+// Zie INTEGRATIES.md voor de afweging: hier staat alleen een vaste plek om
+// account-/property-ID's per klant te noteren. Geen enkele van deze velden
+// doet een API-call — er wordt niets opgehaald of weggeschreven bij Google
+// Ads, Meta, LinkedIn of GA4. Dat is bewust een latere, losse stap (eigen
+// OAuth-app per platform, credentials die alleen WIT kan aanmaken), niet iets
+// wat deze sessie zonder toezicht kan of mag opzetten.
+const PLATFORMS = [
+  { key: 'googleAds', label: 'Google Ads', hint: 'klant-ID, bv. 123-456-7890' },
+  { key: 'metaAds', label: 'Meta Ads', hint: 'ad-account-ID' },
+  { key: 'linkedinAds', label: 'LinkedIn Ads', hint: 'account-ID' },
+  { key: 'ga4', label: 'GA4', hint: 'property-ID' },
+];
+
+router.post('/admin/clients/:clientId/koppelingen', async (req, res) => {
+  await store.update((db) => {
+    const client = db.clients.find((c) => c.id === req.params.clientId);
+    if (!client) return;
+    client.koppelingen = client.koppelingen || {};
+    for (const p of PLATFORMS) client.koppelingen[p.key] = String(req.body[p.key] || '').trim();
+  });
+  res.redirect(`/admin/clients/${req.params.clientId}`);
+});
+
+function renderKoppelingen(client) {
+  const k = client.koppelingen || {};
+  const fields = PLATFORMS.map(
+    (p) => `<label>${esc(p.label)}</label><input type="text" name="${p.key}" placeholder="${esc(p.hint)}" value="${esc(k[p.key] || '')}">`
+  ).join('');
+  return `
+<div class="card" style="margin-top:18px">
+  <div class="card-head"><h2>Koppelingen</h2><span class="pill">referentie, nog niet live</span></div>
+  <p class="muted" style="margin:0 0 14px">Account-/property-ID's per platform, zodat je ze bij de hand hebt. Dit haalt nog niets op en zet niets weg bij het platform zelf — zie <code>INTEGRATIES.md</code> voor het plan daarnaartoe.</p>
+  <form method="post" action="/admin/clients/${client.id}/koppelingen">
+    ${fields}
+    <button type="submit" class="secondary">Opslaan</button>
+  </form>
+</div>`;
 }
 
 function renderProject(db, client, project, query) {
@@ -310,25 +358,26 @@ function renderProject(db, client, project, query) {
   return page({
     wide: true,
     title: `Beheer · ${project.naam}`,
+    brandSub: 'Beheer',
     body: `
-<nav><a href="/admin">Klanten</a><a href="/admin/clients/${client.id}">${esc(client.naam)}</a><a href="/admin/projects/${project.id}">${esc(project.naam)}</a></nav>
+${nav({ href: '/admin', label: 'Klanten' }, { href: `/admin/clients/${client.id}`, label: client.naam }, { href: `/admin/projects/${project.id}`, label: project.naam })}
 <h1>${esc(project.naam)}</h1>
 <p class="sub">${esc(client.naam)} · publieke weergave na aanmelden: <code>/bekijk/${project.id}</code></p>
 ${nieuwWachtwoord}
 <div class="card">
-  <h2 style="font-size:15px;margin:0 0 4px">Pagina</h2>
-  <p class="muted">${project.html ? 'Er staat een pagina klaar.' : 'Nog geen pagina geplaatst.'} ${project.html ? `<a href="/bekijk/${project.id}" target="_blank">bekijken</a>` : ''}</p>
+  <div class="card-head"><h2>Pagina</h2>${project.html ? `<a href="/bekijk/${project.id}" target="_blank">bekijken ↗</a>` : ''}</div>
+  <p class="muted" style="margin:0 0 4px">${project.html ? 'Er staat een pagina klaar.' : 'Nog geen pagina geplaatst.'}</p>
   <form method="post" action="/admin/projects/${project.id}/html" enctype="multipart/form-data">
     <label>Nieuw HTML-bestand plaatsen (vervangt de huidige pagina)</label>
     <input type="file" name="html" accept=".html,text/html">
     <button type="submit" class="secondary">Plaatsen</button>
   </form>
 </div>
-<div class="card" style="margin-top:20px">
-  <h2 style="font-size:15px;margin:0 0 4px">Wie heeft toegang</h2>
+<div class="card">
+  <h2>Wie heeft toegang</h2>
   <table>
     <tr><th>Naam</th><th>Gebruikersnaam</th><th></th></tr>
-    ${rows || '<tr><td colspan="3" class="muted">Nog niemand.</td></tr>'}
+    ${rows || '<tr><td colspan="3" class="empty">Nog niemand.</td></tr>'}
   </table>
   <form method="post" action="/admin/projects/${project.id}/people" class="row" style="margin-top:20px">
     <input type="text" name="naam" placeholder="Naam (optioneel)">
@@ -341,8 +390,8 @@ ${nieuwWachtwoord}
     <button type="submit" class="secondary">Toegang geven</button>
   </form>` : ''}
 </div>
-<form method="post" action="/admin/projects/${project.id}/delete" style="margin-top:20px" onsubmit="return confirm('Project ${esc(project.naam)} verwijderen?')">
-  <button type="submit" class="danger">Project verwijderen</button>
+<form method="post" action="/admin/projects/${project.id}/delete" onsubmit="return confirm('Project ${esc(project.naam)} verwijderen?')">
+  <button type="submit" class="secondary danger small">Project verwijderen</button>
 </form>`,
   });
 }
