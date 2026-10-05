@@ -29,10 +29,14 @@ const BASE_CSS = `
 html{-webkit-text-size-adjust:100%}
 body{margin:0;font-family:var(--font-body);font-size:16px;line-height:1.6;background:var(--paper);color:var(--ink-soft)}
 .topbar{height:4px;background:var(--spray)}
-header.site{display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:1200px;margin:0 auto;padding:22px 24px;width:100%}
+header.site{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10;flex-shrink:0}
+header.site .bar{display:flex;align-items:center;gap:20px;max-width:1200px;margin:0 auto;padding:12px 24px}
+header.site .logo{display:block}
+header.site .mainnav{display:flex;gap:4px;flex:1}
+header.site .mainnav a{padding:7px 14px;border-radius:999px;font-size:14px;font-weight:600;text-decoration:none;color:var(--ink)}
+header.site .mainnav a:hover{background:var(--cloud);color:var(--ink)}
 header.site img{height:22px;width:auto;display:block}
-header.site .who{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--ink-muted);flex-wrap:wrap}
-header.site .who a{text-decoration:none;color:var(--ink-muted)}
+header.site .who{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--ink-muted)}
 header.site .who form{margin:0}
 .wrap{max-width:520px;margin:0 auto;padding:56px 24px 80px}
 .wrap.wide{max-width:1000px}
@@ -116,25 +120,35 @@ const HEAD = (title) => `<meta charset="utf-8">
 <style>${BASE_CSS}</style>`;
 
 // user: { role, naam, username } of null (niet aangemeld)
-function header(user) {
-  const who = user
-    ? `<div class="who"><span>${esc(user.naam || user.username)} <span class="pill ${user.role}">${ROLE_LABEL[user.role]}</span></span>
-<a href="${user.role === 'owner' ? '/admin' : '/'}">Home</a>
-${user.role === 'owner' ? '' : '<a href="/wachtwoord">Wachtwoord</a>'}
-<form method="post" action="/logout"><button class="secondary small" type="submit">Afmelden</button></form></div>`
-    : '';
+// Altijd zichtbare balk bovenaan: logo, navigatie en afmelden.
+function header(user, crumb) {
+  const home = user ? (user.role === 'owner' ? '/admin' : '/?alle=1') : '/login';
+  let nav = '';
+  if (user) {
+    const links = [];
+    if (user.role === 'owner') {
+      links.push('<a href="/admin">Beheer</a>');
+      if (crumb) links.push(`<a href="${esc(crumb.href)}">${esc(crumb.label)}</a>`);
+    } else {
+      links.push('<a href="/?alle=1">Overzicht</a>');
+      links.push('<a href="/wachtwoord">Wachtwoord</a>');
+    }
+    nav = `<nav class="mainnav">${links.join('')}</nav>
+<div class="who"><span class="hide-narrow">${esc(user.naam || user.username)}</span><span class="pill ${esc(user.role)}">${ROLE_LABEL[user.role]}</span>
+<form method="post" action="/logout"><button class="secondary small" type="submit">Afmelden</button></form></div>`;
+  }
   return `<div class="topbar"></div>
-<header class="site"><a href="/"><img src="/assets/wit-logo.png" alt="WIT"></a>${who}</header>`;
+<header class="site"><div class="bar"><a class="logo" href="${home}"><img src="/assets/wit-logo.png" alt="WIT"></a>${nav}</div></header>`;
 }
 
-function page({ title, body, wide, user }) {
+function page({ title, body, wide, user, crumb }) {
   return `<!doctype html>
 <html lang="nl">
 <head>
 ${HEAD(title)}
 </head>
 <body>
-${header(user)}
+${header(user, crumb)}
 <div class="wrap${wide ? ' wide' : ''}">
 ${body}
 </div>
@@ -143,14 +157,14 @@ ${body}
 }
 
 // Volledig scherm: opgeleverde pagina links, feedbackpaneel rechts.
-function viewerPage({ title, user, src, panel }) {
+function viewerPage({ title, user, src, panel, crumb }) {
   return `<!doctype html>
 <html lang="nl">
 <head>
 ${HEAD(title)}
 </head>
 <body class="viewer">
-${header(user)}
+${header(user, crumb)}
 <div class="viewer-main">
   <iframe src="${esc(src)}" title="${esc(title)}" sandbox="allow-scripts allow-popups allow-forms allow-downloads"></iframe>
   <aside class="panel">${panel}</aside>

@@ -81,7 +81,7 @@ router.get('/', requireLogin, (req, res) => {
   const { db, user } = req;
   if (user.role === 'owner') return res.redirect('/admin');
   const projects = db.projects.filter((pr) => user.projectIds.includes(pr.id));
-  if (projects.length === 1) return res.redirect(`/bekijk/${projects[0].id}`);
+  if (projects.length === 1 && !req.query.alle) return res.redirect(`/bekijk/${projects[0].id}`);
   res.send(renderOverzicht(user, projects, db));
 });
 
@@ -137,6 +137,7 @@ router.get('/bekijk/:projectId', requireLogin, (req, res) => {
       title: project.naam,
       user,
       src: `/inhoud/${project.id}`,
+      crumb: { href: `/admin/projects/${project.id}`, label: 'Dit project in beheer' },
       panel: renderPanel(db, project, user),
     })
   );
