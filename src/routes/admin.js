@@ -1,37 +1,18 @@
 const express = require('express');
 const multer = require('multer');
 const store = require('../store');
-const { hashPassword, timingSafeEqual, randomPassword } = require('../auth');
+const { hashPassword, randomPassword } = require('../auth');
 const { page, esc } = require('../views');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 const router = express.Router();
 
+const OWNER = { role: 'owner', naam: 'WIT', username: 'owner' };
+
 function requireAdmin(req, res, next) {
-  if (!req.session.isAdmin) return res.redirect('/admin/login');
+  if (!req.session.isAdmin) return res.redirect('/login');
   next();
 }
-
-router.get('/admin/login', (req, res) => {
-  if (req.session.isAdmin) return res.redirect('/admin');
-  res.send(renderAdminLogin());
-});
-
-router.post('/admin/login', (req, res) => {
-  const user = process.env.ADMIN_USER || '';
-  const pass = process.env.ADMIN_PASSWORD || '';
-  if (!pass) {
-    return res.status(500).send(renderAdminLogin('ADMIN_PASSWORD staat niet in .env op de server.'));
-  }
-  const ok = timingSafeEqual(req.body.username || '', user) && timingSafeEqual(req.body.password || '', pass);
-  if (!ok) return res.status(401).send(renderAdminLogin('Gebruikersnaam of wachtwoord klopt niet.'));
-  req.session.isAdmin = true;
-  res.redirect('/admin');
-});
-
-router.post('/admin/logout', (req, res) => {
-  req.session.destroy(() => res.redirect('/admin/login'));
-});
 
 router.use('/admin', requireAdmin);
 
@@ -65,7 +46,7 @@ router.post('/admin/clients/:clientId/delete', async (req, res) => {
 router.get('/admin/clients/:clientId', (req, res) => {
   const db = store.load();
   const client = db.clients.find((c) => c.id === req.params.clientId);
-  if (!client) return res.status(404).send(page({ title: 'Niet gevonden', body: '<div class="card">Klant niet gevonden. <a href="/admin">Terug</a></div>' }));
+  if (!client) return res.status(404).send(page({ user: OWNER, title: 'Niet gevonden', body: '<div class="card">Klant niet gevonden. <a href="/admin">Terug</a></div>' }));
   res.send(renderClient(db, client));
 });
 
@@ -105,7 +86,7 @@ router.post('/admin/projects/:projectId/delete', async (req, res) => {
 router.get('/admin/projects/:projectId', (req, res) => {
   const db = store.load();
   const project = db.projects.find((p) => p.id === req.params.projectId);
-  if (!project) return res.status(404).send(page({ title: 'Niet gevonden', body: '<div class="card">Project niet gevonden. <a href="/admin">Terug</a></div>' }));
+  if (!project) return res.status(404).send(page({ user: OWNER, title: 'Niet gevonden', body: '<div class="card">Project niet gevonden. <a href="/admin">Terug</a></div>' }));
   const client = db.clients.find((c) => c.id === project.clientId);
   res.send(renderProject(db, client, project, req.query));
 });
@@ -114,7 +95,11 @@ router.post('/admin/projects/:projectId/html', upload.single('html'), async (req
   const html = req.file ? req.file.buffer.toString('utf8') : String(req.body.htmlPaste || '');
   await store.update((db) => {
     const project = db.projects.find((p) => p.id === req.params.projectId);
-    if (project && html) project.html = html;
+    if (project && html) {
+      project.html = html;
+      project.status = 'open';
+      project.besluit = null;
+    }
   });
   res.redirect(`/admin/projects/${req.params.projectId}`);
 });
@@ -125,6 +110,7 @@ router.post('/admin/projects/:projectId/people', async (req, res) => {
   if (!project) return res.redirect('/admin');
   const naam = String(req.body.naam || '').trim();
   const username = String(req.body.username || '').trim();
+  const role = req.body.role === 'reviewer' ? 'reviewer' : 'client';
   if (!username) return res.redirect(`/admin/projects/${req.params.projectId}`);
   const password = randomPassword();
   await store.update((db2) => {
@@ -134,6 +120,8 @@ router.post('/admin/projects/:projectId/people', async (req, res) => {
       clientId: project.clientId,
       naam,
       username,
+      role,
+      mustChange: true,
       passwordHash: hashPassword(password),
       projectIds: [project.id],
       createdAt: new Date().toISOString(),
@@ -170,6 +158,7 @@ router.post('/admin/people/:personId/reset-password', async (req, res) => {
     const person = db.people.find((p) => p.id === req.params.personId);
     if (person) {
       person.passwordHash = hashPassword(password);
+      person.mustChange = true;
       projectId = person.projectIds[0];
     }
   });
@@ -181,6 +170,7 @@ router.post('/admin/people/:personId/delete', async (req, res) => {
   const back = req.body.returnTo || '/admin';
   await store.update((db) => {
     db.people = db.people.filter((p) => p.id !== req.params.personId);
+    // Opmerkingen blijven staan, met de naam waaronder ze geplaatst zijn.
   });
   res.redirect(back);
 });
@@ -194,25 +184,6 @@ function uniqueSlug(existing, base) {
   return slug;
 }
 
-function renderAdminLogin(error) {
-  return page({
-    title: 'Beheer · aanmelden',
-    body: `
-<h1>Beheer</h1>
-<p class="sub">WIT — wit-deliver</p>
-<div class="card">
-  ${error ? `<div class="error">${esc(error)}</div>` : ''}
-  <form method="post" action="/admin/login">
-    <label for="username">Gebruikersnaam</label>
-    <input type="text" id="username" name="username" autocomplete="username" required autofocus>
-    <label for="password">Wachtwoord</label>
-    <input type="password" id="password" name="password" autocomplete="current-password" required>
-    <button type="submit">Aanmelden</button>
-  </form>
-</div>`,
-  });
-}
-
 function renderDashboard(db) {
   const rows = db.clients
     .map((c) => {
@@ -221,16 +192,16 @@ function renderDashboard(db) {
         <td><a href="/admin/clients/${c.id}">${esc(c.naam)}</a></td>
         <td class="muted">${c.slug}</td>
         <td>${projectCount}</td>
-        <td><form method="post" action="/admin/clients/${c.id}/delete" onsubmit="return confirm('Klant ${esc(c.naam)} en alle projecten verwijderen?')"><button type="submit" class="danger">verwijderen</button></form></td>
+        <td><form method="post" action="/admin/clients/${c.id}/delete" onsubmit="return confirm('Klant ${esc(c.naam)} en alle projecten verwijderen?')"><button type="submit" class="danger small">verwijderen</button></form></td>
       </tr>`;
     })
     .join('');
   return page({
     wide: true,
+    user: OWNER,
     title: 'Beheer · klanten',
     body: `
-<nav><a href="/admin">Klanten</a><a href="/admin/logout" onclick="document.getElementById('lo').submit();return false">Afmelden</a>
-<form id="lo" method="post" action="/admin/logout" style="display:none"></form></nav>
+<nav class="crumbs"><a href="/admin">Klanten</a></nav>
 <h1>Klanten</h1>
 <p class="sub">Elke klant is afgeschermd van elke andere. Een project hoort bij één klant.</p>
 <div class="card">
@@ -261,9 +232,10 @@ function renderClient(db, client) {
     .join('');
   return page({
     wide: true,
+    user: OWNER,
     title: `Beheer · ${client.naam}`,
     body: `
-<nav><a href="/admin">Klanten</a><a href="/admin/clients/${client.id}">${esc(client.naam)}</a></nav>
+<nav class="crumbs"><a href="/admin">Klanten</a><a href="/admin/clients/${client.id}">${esc(client.naam)}</a></nav>
 <h1>${esc(client.naam)}</h1>
 <p class="sub">Projecten van deze klant.</p>
 <div class="card">
@@ -282,6 +254,20 @@ function renderClient(db, client) {
   });
 }
 
+function renderFeedback(db, project) {
+  const status = project.status === 'goedgekeurd' ? '<span class="pill ok">goedgekeurd</span>'
+    : project.status === 'wijzigingen' ? '<span class="pill wijzig">wijzigingen gevraagd</span>'
+    : '<span class="pill">in review</span>';
+  const comments = db.comments.filter((c) => c.projectId === project.id).map((c) =>
+    `<div class="comment"><div class="meta"><b>${esc(c.door)}</b><span class="pill ${esc(c.role)}">${esc(c.role)}</span>${esc(new Date(c.createdAt).toLocaleString('nl-BE', { dateStyle: 'medium', timeStyle: 'short' }))}</div><p>${esc(c.tekst)}</p></div>`
+  ).join('');
+  const besluit = project.besluit ? ` · ${esc(project.besluit.door)}` : '';
+  return `<div class="card" style="margin-top:20px">
+  <h2>Feedback ${status}<span class="muted">${besluit}</span></h2>
+  ${comments || '<p class="muted">Nog geen opmerkingen.</p>'}
+</div>`;
+}
+
 function renderProject(db, client, project, query) {
   const people = db.people.filter((p) => p.projectIds.includes(project.id));
   const clientPeopleZonderToegang = db.people.filter((p) => p.clientId === project.clientId && !p.projectIds.includes(project.id));
@@ -290,14 +276,15 @@ function renderProject(db, client, project, query) {
       (p) => `<tr>
         <td>${esc(p.naam || '—')}</td>
         <td>${esc(p.username)}</td>
+        <td><span class="pill ${p.role}">${p.role === 'reviewer' ? 'Reviewer' : 'Client'}</span></td>
         <td class="row">
           <form method="post" action="/admin/people/${p.id}/reset-password">
             <input type="hidden" name="returnTo" value="/admin/projects/${project.id}">
             <input type="hidden" name="username" value="${esc(p.username)}">
-            <button type="submit" class="secondary">nieuw wachtwoord</button>
+            <button type="submit" class="secondary small">nieuw wachtwoord</button>
           </form>
           <form method="post" action="/admin/projects/${project.id}/revoke/${p.id}">
-            <button type="submit" class="secondary">toegang intrekken</button>
+            <button type="submit" class="secondary small">toegang intrekken</button>
           </form>
         </td>
       </tr>`
@@ -305,13 +292,14 @@ function renderProject(db, client, project, query) {
     .join('');
   const grantOptions = clientPeopleZonderToegang.map((p) => `<option value="${p.id}">${esc(p.naam || p.username)} (${esc(p.username)})</option>`).join('');
   const nieuwWachtwoord = query.nieuwWachtwoord
-    ? `<div class="notice">Account <b>${esc(query.nieuwGebruiker)}</b> — wachtwoord: <code>${esc(query.nieuwWachtwoord)}</code><br>Dit wachtwoord wordt maar één keer getoond. Geef het buiten dit scherm om door (niet per mail als het gevoelig ligt).</div>`
+    ? `<div class="notice">Account <b>${esc(query.nieuwGebruiker)}</b> — wachtwoord: <code>${esc(query.nieuwWachtwoord)}</code><br>Dit startwachtwoord wordt maar één keer getoond; bij de eerste aanmelding kiest de persoon een eigen wachtwoord. Geef het buiten dit scherm om door (niet per mail als het gevoelig ligt).</div>`
     : '';
   return page({
     wide: true,
+    user: OWNER,
     title: `Beheer · ${project.naam}`,
     body: `
-<nav><a href="/admin">Klanten</a><a href="/admin/clients/${client.id}">${esc(client.naam)}</a><a href="/admin/projects/${project.id}">${esc(project.naam)}</a></nav>
+<nav class="crumbs"><a href="/admin">Klanten</a><a href="/admin/clients/${client.id}">${esc(client.naam)}</a><a href="/admin/projects/${project.id}">${esc(project.naam)}</a></nav>
 <h1>${esc(project.naam)}</h1>
 <p class="sub">${esc(client.naam)} · publieke weergave na aanmelden: <code>/bekijk/${project.id}</code></p>
 ${nieuwWachtwoord}
@@ -324,16 +312,18 @@ ${nieuwWachtwoord}
     <button type="submit" class="secondary">Plaatsen</button>
   </form>
 </div>
+${renderFeedback(db, project)}
 <div class="card" style="margin-top:20px">
   <h2 style="font-size:15px;margin:0 0 4px">Wie heeft toegang</h2>
   <table>
-    <tr><th>Naam</th><th>Gebruikersnaam</th><th></th></tr>
-    ${rows || '<tr><td colspan="3" class="muted">Nog niemand.</td></tr>'}
+    <tr><th>Naam</th><th>Gebruikersnaam</th><th>Rol</th><th></th></tr>
+    ${rows || '<tr><td colspan="4" class="muted">Nog niemand.</td></tr>'}
   </table>
   <form method="post" action="/admin/projects/${project.id}/people" class="row" style="margin-top:20px">
     <input type="text" name="naam" placeholder="Naam (optioneel)">
     <input type="text" name="username" placeholder="Gebruikersnaam" required>
-    <button type="submit">Nieuw account + toegang</button>
+    <select name="role" style="width:auto" aria-label="Rol"><option value="client">Client (beslist)</option><option value="reviewer">Reviewer (reageert)</option></select>
+    <button type="submit" style="margin-top:0">Nieuw account + toegang</button>
   </form>
   ${clientPeopleZonderToegang.length ? `
   <form method="post" action="/admin/projects/${project.id}/grant" class="row" style="margin-top:12px">

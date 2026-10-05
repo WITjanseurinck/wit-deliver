@@ -34,8 +34,22 @@ cp .env.example .env   # vul SESSION_SECRET en ADMIN_PASSWORD in
 npm start
 ```
 
-- Beheer: `http://localhost:3300/admin` (inloggen met `ADMIN_USER`/`ADMIN_PASSWORD` uit `.env`)
-- Klantaanmelding: `http://localhost:3300/login`
+- Eén aanmeldscherm voor iedereen: `http://localhost:3300/login`
+- Owner: inloggen met `ADMIN_USER`/`ADMIN_PASSWORD` uit `.env`, daarna naar `/admin`
+
+## Rollen
+
+| Rol | Wie | Kan |
+|---|---|---|
+| **Owner** | WIT (gegevens in `.env`) | alles beheren: klanten, projecten, pagina's, accounts, wachtwoorden; ziet alle feedback |
+| **Client** | persoon van de klant | eigen projecten bekijken, opmerkingen plaatsen, **goedkeuren of wijzigingen vragen** |
+| **Reviewer** | meelezer (ook extern) | eigen projecten bekijken en opmerkingen plaatsen, **niet beslissen** |
+
+Wachtwoorden: nieuwe accounts krijgen een startwachtwoord en kiezen bij de eerste
+aanmelding een eigen (min. 10 tekens). Aanmelden wordt afgeremd na 8 mislukte
+pogingen per kwartier. Opgeleverde pagina's draaien in een sandbox
+(`/inhoud/:id`) en zijn alleen zichtbaar voor wie toegang heeft. Een nieuwe
+pagina plaatsen zet de status terug op "in review".
 
 ## Werking in het kort
 

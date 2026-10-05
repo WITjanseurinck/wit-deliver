@@ -34,4 +34,47 @@ function randomPassword() {
   return out;
 }
 
-module.exports = { hashPassword, checkPassword, timingSafeEqual, randomPassword };
+// Wie is er aangemeld? Eén van drie rollen:
+//   owner     — WIT zelf (ADMIN_USER/ADMIN_PASSWORD uit .env): beheert alles
+//   client    — een persoon van de klant: bekijkt en keurt goed of vraagt wijzigingen
+//   reviewer  — meelezer (ook extern): bekijkt en geeft opmerkingen, beslist niet
+function currentUser(req, db) {
+  if (req.session.isAdmin) {
+    return { role: 'owner', naam: 'WIT', username: process.env.ADMIN_USER || 'owner' };
+  }
+  if (!req.session.personId) return null;
+  const p = db.people.find((x) => x.id === req.session.personId);
+  return p || null;
+}
+
+// Eenvoudige rem op wachtwoord raden: per IP + gebruikersnaam, 8 mislukte
+// pogingen per 15 minuten. In het geheugen is genoeg voor één proces.
+const failures = new Map();
+const WINDOW = 15 * 60 * 1000;
+const MAX_FAILS = 8;
+function throttleKey(req, username) {
+  return `${req.ip}|${String(username || '').toLowerCase()}`;
+}
+function isThrottled(req, username) {
+  const k = throttleKey(req, username);
+  const f = (failures.get(k) || []).filter((t) => Date.now() - t < WINDOW);
+  failures.set(k, f);
+  return f.length >= MAX_FAILS;
+}
+function recordFailure(req, username) {
+  const k = throttleKey(req, username);
+  failures.set(k, [...(failures.get(k) || []), Date.now()]);
+}
+function clearFailures(req, username) {
+  failures.delete(throttleKey(req, username));
+}
+
+function validNewPassword(pw) {
+  if (String(pw || '').length < 10) return 'Kies een wachtwoord van minstens 10 tekens.';
+  return null;
+}
+
+module.exports = {
+  hashPassword, checkPassword, timingSafeEqual, randomPassword,
+  currentUser, isThrottled, recordFailure, clearFailures, validNewPassword,
+};

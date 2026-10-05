@@ -13,13 +13,17 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 function empty() {
-  return { clients: [], projects: [], people: [] };
+  return { clients: [], projects: [], people: [], comments: [] };
 }
 
 function load() {
   if (!fs.existsSync(DB_FILE)) return empty();
   try {
-    return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+    const db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+    // Oudere databestanden (van voor rollen en feedback) aanvullen.
+    if (!db.comments) db.comments = [];
+    db.people.forEach((p) => { if (!p.role) p.role = 'client'; });
+    return db;
   } catch (e) {
     throw new Error(`data/db.json is beschadigd of onleesbaar: ${e.message}`);
   }

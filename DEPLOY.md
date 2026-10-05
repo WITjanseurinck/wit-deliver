@@ -115,7 +115,7 @@ erachter zit — niet per se nodig om "deliver" te gebruiken).
    wachtwoorden in platte tekst over de lijn.
 
 6. **Controleer.**
-   - `https://deliver.wit.agency/admin/login` → beheerslogin.
+   - `https://deliver.wit.agency/login` → aanmelden (de owner gaat daarna naar `/admin`).
    - Maak een testklant + testproject, plaats een simpele HTML-pagina, maak
      een account aan, log in een incognitovenster in als dat account, en
      controleer dat je **alleen** dat project ziet.

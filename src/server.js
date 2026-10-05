@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const path = require('path');
 const express = require('express');
 const session = require('express-session');
 const publicRoutes = require('./routes/public');
@@ -14,7 +15,7 @@ if (!SESSION_SECRET) {
   process.exit(1);
 }
 if (!process.env.ADMIN_PASSWORD) {
-  console.warn('Let op: ADMIN_PASSWORD staat niet in .env — /admin/login werkt dan niet.');
+  console.warn('Let op: ADMIN_PASSWORD staat niet in .env — aanmelden als owner werkt dan niet.');
 }
 
 const app = express();
@@ -22,6 +23,7 @@ const app = express();
 // nodig zodat secure cookies en req.secure kloppen.
 app.set('trust proxy', 1);
 
+app.use('/assets', express.static(path.join(__dirname, 'public'), { maxAge: '7d' }));
 app.use(express.urlencoded({ extended: false, limit: '25mb' }));
 app.use(
   session({
