@@ -51,12 +51,6 @@ npm start
 5. Die persoon logt in op `/login` met dat account en ziet alleen de
    project(en) waar die toegang toe heeft.
 
-Op de klantpagina staat ook **Koppelingen**: een vaste plek om de account-/
-property-ID's per advertentieplatform (Google Ads, Meta Ads, LinkedIn Ads,
-GA4) te noteren. Dat is pure naslaginfo — er gebeurt geen API-call naar die
-platformen. Zie `INTEGRATIES.md` voor waarom dat (nog) niet verder gaat en
-wat een verantwoorde volgende stap zou zijn.
-
 Toegang intrekken = op de projectpagina "toegang intrekken" bij die persoon.
 Het account blijft bestaan (kan nog steeds inloggen voor andere projecten
 waar het wel toegang toe heeft) — pas bij "verwijderen" verdwijnt het account
